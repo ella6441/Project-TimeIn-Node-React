@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+model User {
+  id          String   @id @default(uuid())
+  fullName    String
+  email       String   @unique
+  password    String
+  role        String   @default("EMPLOYEE")
+  team        String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  managedProjects Project[]   @relation("ProjectManager")
+  assignedTasks   Task[]
+  timeEntries     TimeEntry[]
+}
+
+model Project {
+  id                    String   @id @default(uuid())
+  projectName           String
+  description           String?
+  status                String   @default("ACTIVE")
+  managerId             String?
+  externalClickUpListId String?
+  gitRepositoryUrl      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  manager     User?       @relation("ProjectManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks       Task[]
+  timeEntries TimeEntry[]
+}
+
+model Task {
+  id             String   @id @default(uuid())
+  taskName       String
+  description    String?
+  projectId      String
+  assignedUserId String?
+  status         String   @default("TODO")
+  priority       String   @default("MEDIUM")
+  clickUpTaskId  String?
+  estimatedHours Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignedUser User?       @relation(fields: [assignedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  timeEntries  TimeEntry[]
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model TimeEntry {
+  id                   String   @id @default(uuid())
+  userId               String
+  projectId            String
+  taskId               String
+  date                 DateTime
+  startTime            DateTime
+  endTime              DateTime
+  durationMinutes      Int
+  workType             String   @default("DEVELOPMENT")
+  description          String?
+  source               String   @default("MANUAL")
+  status               String   @default("DRAFT")
+  relatedCommitHash    String?
+  relatedClickUpTaskId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  project Project @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}

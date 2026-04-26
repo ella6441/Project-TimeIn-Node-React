@@ -1,0 +1,135 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - develop
+      - main
+
+variables:
+  NODE_VERSION: '20.x'
+  FRONTEND_DIR: 'frontend'
+  BACKEND_DIR: 'backend'
+
+stages:
+
+# ─────────────────────────────────────────────────────────────
+#  STAGE 1 — Backend CI
+# ─────────────────────────────────────────────────────────────
+  - stage: Backend
+    displayName: 'Backend — Build & Test'
+    jobs:
+      - job: BackendCI
+        displayName: 'NestJS CI'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            displayName: 'Use Node $(NODE_VERSION)'
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+            workingDirectory: $(BACKEND_DIR)
+
+          - script: npm run lint
+            displayName: 'Lint'
+            workingDirectory: $(BACKEND_DIR)
+
+          - script: npm run test
+            displayName: 'Unit tests'
+            workingDirectory: $(BACKEND_DIR)
+            continueOnError: false
+
+          - script: npm run build
+            displayName: 'Build'
+            workingDirectory: $(BACKEND_DIR)
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish backend artifact'
+            inputs:
+              pathToPublish: '$(BACKEND_DIR)/dist'
+              artifactName: 'backend-dist'
+
+# ─────────────────────────────────────────────────────────────
+#  STAGE 2 — Frontend CI
+# ─────────────────────────────────────────────────────────────
+  - stage: Frontend
+    displayName: 'Frontend — Build & Test'
+    dependsOn: []
+    jobs:
+      - job: FrontendCI
+        displayName: 'React + Vite CI'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            displayName: 'Use Node $(NODE_VERSION)'
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+            workingDirectory: $(FRONTEND_DIR)
+
+          - script: npm run lint 2>/dev/null || echo "No lint script, skipping"
+            displayName: 'Lint (if configured)'
+            workingDirectory: $(FRONTEND_DIR)
+
+          - script: npm run build
+            displayName: 'Build production'
+            workingDirectory: $(FRONTEND_DIR)
+            env:
+              NODE_ENV: production
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish frontend artifact'
+            inputs:
+              pathToPublish: '$(FRONTEND_DIR)/dist'
+              artifactName: 'frontend-dist'
+
+# ─────────────────────────────────────────────────────────────
+#  STAGE 3 — Deploy (רק מ-main)
+# ─────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: 'Deploy to Production'
+    dependsOn:
+      - Backend
+      - Frontend
+    condition: |
+      and(
+        succeeded('Backend'),
+        succeeded('Frontend'),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+    jobs:
+      - deployment: DeployProd
+        displayName: 'Deploy to Production Environment'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: backend-dist
+
+                - download: current
+                  artifact: frontend-dist
+
+                - script: |
+                    echo "✅ Deploying backend..."
+                    # כאן מוסיפים את פקודות ה-deploy האמיתיות
+                    # לדוגמה: az webapp deploy / docker push / scp וכו'
+                  displayName: 'Deploy backend'
+
+                - script: |
+                    echo "✅ Deploying frontend..."
+                    # כאן מוסיפים העלאה ל-Azure Static Web Apps / S3 / Nginx
+                  displayName: 'Deploy frontend'
