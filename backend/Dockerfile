@@ -12,10 +12,9 @@ RUN npm ci
 
 COPY src/ ./src/
 
-RUN npx prisma generate && ls src/generated/prisma/
-RUN npm run build && ls dist/
-RUN ls dist/main.js
+RUN npx prisma generate
+RUN npm run build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && node dist/main"]
+CMD ["sh", "-c", "npx prisma db push && node dist/src/main"]
