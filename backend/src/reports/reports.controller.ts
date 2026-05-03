@@ -43,7 +43,9 @@ export class ReportsController {
     return this.reportsService.byTask(req.user, filters);
   }
 
-  @ApiOperation({ summary: 'Daily breakdown — hours per day with employee detail' })
+  @ApiOperation({
+    summary: 'Daily breakdown — hours per day with employee detail',
+  })
   @Get('daily')
   daily(@Request() req: RequestWithUser, @Query() filters: ReportFiltersDto) {
     return this.reportsService.daily(req.user, filters);
@@ -51,7 +53,19 @@ export class ReportsController {
 
   @ApiOperation({ summary: 'Anomaly report — long entries and missing days' })
   @Get('anomalies')
-  anomalies(@Request() req: RequestWithUser, @Query() filters: ReportFiltersDto) {
+  anomalies(
+    @Request() req: RequestWithUser,
+    @Query() filters: ReportFiltersDto,
+  ) {
     return this.reportsService.anomalies(req.user, filters);
+  }
+
+  @ApiOperation({ summary: 'Git activity vs time entries gap analysis' })
+  @Get('git-gaps')
+  gitGaps(
+    @Request() req: RequestWithUser,
+    @Query() filters: ReportFiltersDto,
+  ) {
+    return this.reportsService.gitGaps(req.user, filters);
   }
 }

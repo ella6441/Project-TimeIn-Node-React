@@ -9,18 +9,18 @@ import { Roles } from '../auth/roles.decorator';
 @ApiTags('Settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
 @Controller('settings')
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}
 
-  @ApiOperation({ summary: 'Get all system settings (Admin only)' })
+  @ApiOperation({ summary: 'Get all system settings' })
   @Get()
   findAll() {
     return this.settingsService.findAll();
   }
 
   @ApiOperation({ summary: 'Update a system setting (Admin only)' })
+  @Roles('ADMIN')
   @Patch(':key')
   update(@Param('key') key: string, @Body() dto: UpdateSettingDto) {
     return this.settingsService.update(key, dto);

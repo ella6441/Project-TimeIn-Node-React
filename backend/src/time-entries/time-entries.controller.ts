@@ -43,7 +43,11 @@ export class TimeEntriesController {
 
   @ApiOperation({ summary: 'Get my time entries with pagination' })
   @ApiQuery({ name: 'projectId', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'],
+  })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @Get('mine')
@@ -69,6 +73,14 @@ export class TimeEntriesController {
     return this.timeEntriesService.getSummary(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get auto-suggestions based on Git commits and ClickUp tasks for a given date' })
+  @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD (defaults to today)' })
+  @Get('suggestions')
+  getSuggestions(@Request() req: RequestWithUser, @Query('date') date?: string) {
+    const targetDate = date ?? new Date().toISOString().slice(0, 10);
+    return this.timeEntriesService.getSuggestions(req.user.id, targetDate);
+  }
+
   @ApiOperation({ summary: 'Get my hours breakdown by project and task' })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
@@ -87,7 +99,11 @@ export class TimeEntriesController {
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'projectId', required: false })
   @ApiQuery({ name: 'taskId', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'],
+  })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @Roles('MANAGER', 'ADMIN')
@@ -112,14 +128,18 @@ export class TimeEntriesController {
     });
   }
 
-  @ApiOperation({ summary: 'Approve a submitted time entry (Manager/Admin only)' })
+  @ApiOperation({
+    summary: 'Approve a submitted time entry (Manager/Admin only)',
+  })
   @Roles('MANAGER', 'ADMIN')
   @Patch(':id/approve')
   approve(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.timeEntriesService.approve(id, req.user);
   }
 
-  @ApiOperation({ summary: 'Reject a submitted time entry (Manager/Admin only)' })
+  @ApiOperation({
+    summary: 'Reject a submitted time entry (Manager/Admin only)',
+  })
   @Roles('MANAGER', 'ADMIN')
   @Patch(':id/reject')
   reject(@Param('id') id: string, @Request() req: RequestWithUser) {

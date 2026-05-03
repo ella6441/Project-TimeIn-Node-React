@@ -22,11 +22,8 @@ export class CreateTimeEntryDto {
   @IsDateString()
   endTime: string;
 
-  @ApiPropertyOptional({
-    enum: ['DEVELOPMENT', 'DESIGN', 'MEETINGS', 'REVIEW', 'TESTING', 'OTHER'],
-    default: 'DEVELOPMENT',
-  })
-  @IsIn(['DEVELOPMENT', 'DESIGN', 'MEETINGS', 'REVIEW', 'TESTING', 'OTHER'])
+  @ApiPropertyOptional({ example: 'DEVELOPMENT', default: 'DEVELOPMENT' })
+  @IsString()
   @IsOptional()
   workType?: string;
 
@@ -35,8 +32,8 @@ export class CreateTimeEntryDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ enum: ['MANUAL', 'TIMER'], default: 'MANUAL' })
-  @IsIn(['MANUAL', 'TIMER'])
+  @ApiPropertyOptional({ enum: ['MANUAL', 'TIMER', 'GIT', 'CLICKUP', 'SUGGESTED'], default: 'MANUAL' })
+  @IsIn(['MANUAL', 'TIMER', 'GIT', 'CLICKUP', 'SUGGESTED'])
   @IsOptional()
   source?: string;
 

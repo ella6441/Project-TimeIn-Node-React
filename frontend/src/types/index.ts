@@ -1,7 +1,7 @@
 export type Role = 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
 export type WorkType = 'DEVELOPMENT' | 'DESIGN' | 'MEETINGS' | 'REVIEW' | 'TESTING' | 'OTHER';
 export type EntryStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
-export type EntrySource = 'MANUAL' | 'TIMER' | 'IMPORT';
+export type EntrySource = 'MANUAL' | 'TIMER' | 'GIT' | 'CLICKUP' | 'SUGGESTED';
 export type ProjectStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
 export type TimerStatus = 'RUNNING' | 'PAUSED';
@@ -12,6 +12,7 @@ export interface AuthUser {
   fullName: string;
   role: Role;
   team: string | null;
+  managerId: string | null;
 }
 
 export interface User {
@@ -20,6 +21,7 @@ export interface User {
   fullName: string;
   role: Role;
   team: string | null;
+  managerId: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -96,4 +98,13 @@ export interface HoursSummary {
   todayMinutes: number;
   weekMinutes: number;
   monthMinutes: number;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
 }

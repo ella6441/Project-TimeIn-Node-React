@@ -7,6 +7,7 @@ export interface CreateUserDto {
   fullName: string;
   role: string;
   team?: string;
+  managerId?: string;
 }
 
 export interface UpdateUserDto {
@@ -14,6 +15,7 @@ export interface UpdateUserDto {
   role?: string;
   team?: string;
   isActive?: boolean;
+  managerId?: string | null;
 }
 
 export const usersApi = {

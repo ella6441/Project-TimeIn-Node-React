@@ -21,4 +21,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'ID of the manager this user reports to',
+  })
+  @IsOptional()
+  @IsString()
+  managerId?: string | null;
 }

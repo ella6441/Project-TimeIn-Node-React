@@ -1,11 +1,9 @@
 export interface PaginatedResult<T> {
   data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export function paginate<T>(
@@ -16,12 +14,10 @@ export function paginate<T>(
 ): PaginatedResult<T> {
   return {
     data,
-    meta: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    },
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
   };
 }
 

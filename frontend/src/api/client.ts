@@ -46,7 +46,7 @@ client.interceptors.response.use(
       try {
         const { data } = await axios.post(
           'http://localhost:3000/api/auth/refresh',
-          { refreshToken },
+          { refresh_token: refreshToken },
         );
         useAuthStore.getState().setTokens(data.access_token, data.refresh_token);
         processQueue(null, data.access_token);

@@ -15,8 +15,11 @@ async function main() {
 
   console.log('Seeding database...');
 
-  // Clean up existing seed data
+  // Clean up existing seed data (order matters — children before parents)
+  await prisma.gitCommit.deleteMany({});
+  await prisma.clickUpTaskLink.deleteMany({});
   await prisma.timeEntry.deleteMany({});
+  await prisma.notification.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.project.deleteMany({});
   await prisma.user.deleteMany({});
@@ -52,6 +55,7 @@ async function main() {
       password: employeePassword,
       role: 'EMPLOYEE',
       team: 'Backend Team',
+      managerId: manager.id,
     },
   });
 
@@ -62,6 +66,7 @@ async function main() {
       password: employeePassword,
       role: 'EMPLOYEE',
       team: 'Frontend Team',
+      managerId: manager.id,
     },
   });
 

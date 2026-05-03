@@ -97,7 +97,7 @@ export class AuthService {
     role: string,
   ): Promise<[string, string]> {
     return Promise.all([
-      this.jwt.signAsync({ sub: userId, email, role }, { expiresIn: '15m' }),
+      this.jwt.signAsync({ sub: userId, email, role }, { expiresIn: '2h' }),
       this.jwt.signAsync(
         { sub: userId },
         {

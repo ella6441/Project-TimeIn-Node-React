@@ -68,8 +68,7 @@ export class TimerService {
       throw new BadRequestException('Timer is already running');
     }
 
-    const pausedMs =
-      new Date().getTime() - new Date(state.pausedAt!).getTime();
+    const pausedMs = new Date().getTime() - new Date(state.pausedAt!).getTime();
     state.totalPausedMs += pausedMs;
     state.pausedAt = null;
     state.status = 'running';
@@ -87,9 +86,7 @@ export class TimerService {
       now.getTime() -
       start.getTime() -
       state.totalPausedMs -
-      (state.pausedAt
-        ? now.getTime() - new Date(state.pausedAt).getTime()
-        : 0);
+      (state.pausedAt ? now.getTime() - new Date(state.pausedAt).getTime() : 0);
 
     const durationMinutes = Math.max(1, Math.round(totalMs / 60000));
 
@@ -144,11 +141,11 @@ export class TimerService {
   private formatResponse(state: TimerState) {
     const now = new Date();
     const start = new Date(state.startTime);
-    let elapsedMs =
-      now.getTime() - start.getTime() - state.totalPausedMs;
+    let elapsedMs = now.getTime() - start.getTime() - state.totalPausedMs;
     if (state.status === 'paused' && state.pausedAt) {
       elapsedMs -= now.getTime() - new Date(state.pausedAt).getTime();
     }
+    const safeMs = Math.max(0, elapsedMs);
 
     return {
       status: state.status,
@@ -156,7 +153,8 @@ export class TimerService {
       taskId: state.taskId,
       description: state.description,
       startTime: state.startTime,
-      elapsedMinutes: Math.max(0, Math.floor(elapsedMs / 60000)),
+      elapsedMinutes: Math.floor(safeMs / 60000),
+      elapsedMs: safeMs,
     };
   }
 

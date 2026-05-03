@@ -43,7 +43,7 @@ export class TasksService {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 10;
 
-    // MANAGER sees only tasks in their projects
+    // MANAGER sees tasks in their projects; EMPLOYEE sees tasks in their manager's projects
     let where: Record<string, unknown> = {
       ...(projectId && { projectId }),
       ...(userId && { assignedUserId: userId }),
@@ -55,7 +55,26 @@ export class TasksService {
         select: { id: true },
       });
       const myProjectIds = myProjects.map((p) => p.id);
-      where = { ...where, projectId: { in: myProjectIds } };
+      if (!projectId && myProjectIds.length === 0) {
+        return paginate([], 0, page, limit);
+      }
+      where = {
+        ...where,
+        projectId: projectId ? projectId : { in: myProjectIds },
+      };
+    } else if (requester.role === 'EMPLOYEE' && requester.managerId) {
+      const managerProjects = await this.prisma.project.findMany({
+        where: { managerId: requester.managerId as string },
+        select: { id: true },
+      });
+      const managerProjectIds = managerProjects.map((p) => p.id);
+      if (!projectId && managerProjectIds.length === 0) {
+        return paginate([], 0, page, limit);
+      }
+      where = {
+        ...where,
+        projectId: projectId ? projectId : { in: managerProjectIds },
+      };
     }
 
     const [tasks, total] = await Promise.all([

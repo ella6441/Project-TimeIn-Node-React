@@ -27,9 +27,13 @@ export class ProjectsService {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 10;
 
-    // MANAGER sees only projects they manage
-    const where =
-      requester.role === 'MANAGER' ? { managerId: requester.id } : {};
+    // MANAGER sees only projects they manage; EMPLOYEE sees only their manager's projects
+    let where: { managerId?: string } = {};
+    if (requester.role === 'MANAGER') {
+      where = { managerId: requester.id };
+    } else if (requester.role === 'EMPLOYEE' && requester.managerId) {
+      where = { managerId: requester.managerId as string };
+    }
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
