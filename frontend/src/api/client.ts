@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/auth.store';
 
 const client = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -45,7 +45,7 @@ client.interceptors.response.use(
       const refreshToken = useAuthStore.getState().refreshToken;
       try {
         const { data } = await axios.post(
-          'http://localhost:3000/api/auth/refresh',
+          `${import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'}/auth/refresh`,
           { refresh_token: refreshToken },
         );
         useAuthStore.getState().setTokens(data.access_token, data.refresh_token);
