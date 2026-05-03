@@ -16,7 +16,7 @@ export const tasksApi = {
   create: (dto: CreateTaskDto) =>
     client.post<Task>('/tasks', dto),
 
-  findAll: (params?: { projectId?: string; page?: number; limit?: number }) =>
+  findAll: (params?: { projectId?: string; userId?: string; page?: number; limit?: number }) =>
     client.get<PaginatedResponse<Task>>('/tasks', { params }),
 
   findOne: (id: string) =>

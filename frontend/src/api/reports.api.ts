@@ -22,4 +22,7 @@ export const reportsApi = {
 
   anomalies: (filters?: ReportFilters) =>
     client.get('/reports/anomalies', { params: filters }),
+
+  gitGaps: (filters?: ReportFilters) =>
+    client.get('/reports/git-gaps', { params: filters }),
 };

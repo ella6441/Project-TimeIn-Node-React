@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTimeEntryDto } from './dto/create-time-entry.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { paginate, getSkip } from '../common/helpers/paginate.helper';
@@ -16,6 +17,7 @@ export class TimeEntriesService {
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(dto: CreateTimeEntryDto, user: AuthenticatedUser) {
@@ -27,6 +29,12 @@ export class TimeEntriesService {
     }
 
     await this.checkRetroactive(new Date(dto.date));
+    await this.checkRequiredFields(dto);
+    await this.checkDailyLimit(
+      user.id,
+      new Date(dto.date),
+      Math.round((end.getTime() - start.getTime()) / 60000),
+    );
 
     const durationMinutes = Math.round(
       (end.getTime() - start.getTime()) / 60000,
@@ -69,7 +77,12 @@ export class TimeEntriesService {
   async findMine(
     userId: string,
     pagination: PaginationDto,
-    filters: { projectId?: string; from?: string; to?: string; status?: string },
+    filters: {
+      projectId?: string;
+      from?: string;
+      to?: string;
+      status?: string;
+    },
   ) {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 10;
@@ -118,10 +131,11 @@ export class TimeEntriesService {
 
     if (requester.role === 'MANAGER') {
       const teamMembers = await this.prisma.user.findMany({
-        where: { team: requester.team ?? undefined },
+        where: { managerId: requester.id },
         select: { id: true },
       });
       const teamIds = teamMembers.map((u) => u.id);
+      if (!teamIds.includes(requester.id)) teamIds.push(requester.id);
       userIdFilter =
         filters.userId && teamIds.includes(filters.userId)
           ? filters.userId
@@ -155,7 +169,10 @@ export class TimeEntriesService {
     return paginate(entries, total, page, limit);
   }
 
-  async getMyBreakdown(userId: string, filters: { from?: string; to?: string }) {
+  async getMyBreakdown(
+    userId: string,
+    filters: { from?: string; to?: string },
+  ) {
     const where = {
       userId,
       ...(filters.from && filters.to
@@ -261,6 +278,12 @@ export class TimeEntriesService {
       throw new ForbiddenException('Not allowed');
     }
 
+    const requireDesc = await this.settings.get('require_description');
+    const descValue = dto.description !== undefined ? dto.description : entry.description;
+    if (requireDesc === 'true' && !descValue?.trim()) {
+      throw new BadRequestException('Description is required');
+    }
+
     const start = dto.startTime ? new Date(dto.startTime) : entry.startTime;
     const end = dto.endTime ? new Date(dto.endTime) : entry.endTime;
 
@@ -311,16 +334,33 @@ export class TimeEntriesService {
     if (requester.role === 'MANAGER') {
       const entryOwner = await this.prisma.user.findUnique({
         where: { id: entry.userId },
-        select: { team: true },
+        select: { managerId: true },
       });
-      if (!entryOwner || entryOwner.team !== requester.team) {
-        throw new ForbiddenException('You can only approve entries from your team');
+      if (!entryOwner) {
+        throw new NotFoundException('Entry owner not found');
+      }
+      if (!entryOwner.managerId) {
+        throw new ForbiddenException(
+          'This employee is not assigned to any manager',
+        );
+      }
+      if (entryOwner.managerId !== requester.id) {
+        throw new ForbiddenException(
+          'You can only approve entries from your team',
+        );
       }
     }
-    return this.prisma.timeEntry.update({
+    const updated = await this.prisma.timeEntry.update({
       where: { id },
       data: { status: 'APPROVED' },
     });
+    const dateStr = updated.date.toISOString().slice(0, 10);
+    await this.notifications.create(
+      entry.userId,
+      'Time Entry Approved ✓',
+      `Your time entry for ${dateStr} has been approved.`,
+    );
+    return updated;
   }
 
   async reject(id: string, requester: AuthenticatedUser) {
@@ -332,16 +372,33 @@ export class TimeEntriesService {
     if (requester.role === 'MANAGER') {
       const entryOwner = await this.prisma.user.findUnique({
         where: { id: entry.userId },
-        select: { team: true },
+        select: { managerId: true },
       });
-      if (!entryOwner || entryOwner.team !== requester.team) {
-        throw new ForbiddenException('You can only reject entries from your team');
+      if (!entryOwner) {
+        throw new NotFoundException('Entry owner not found');
+      }
+      if (!entryOwner.managerId) {
+        throw new ForbiddenException(
+          'This employee is not assigned to any manager',
+        );
+      }
+      if (entryOwner.managerId !== requester.id) {
+        throw new ForbiddenException(
+          'You can only reject entries from your team',
+        );
       }
     }
-    return this.prisma.timeEntry.update({
+    const updated = await this.prisma.timeEntry.update({
       where: { id },
       data: { status: 'REJECTED' },
     });
+    const dateStr = updated.date.toISOString().slice(0, 10);
+    await this.notifications.create(
+      entry.userId,
+      'Time Entry Rejected ✗',
+      `Your time entry for ${dateStr} has been rejected.`,
+    );
+    return updated;
   }
 
   async copy(id: string, user: AuthenticatedUser) {
@@ -377,6 +434,40 @@ export class TimeEntriesService {
     });
   }
 
+  private async checkRequiredFields(dto: CreateTimeEntryDto) {
+    const requireDesc = await this.settings.get('require_description');
+    if (requireDesc === 'true' && !dto.description?.trim()) {
+      throw new BadRequestException('Description is required');
+    }
+    const requireWorkType = await this.settings.get('require_work_type');
+    if (requireWorkType === 'true' && !dto.workType) {
+      throw new BadRequestException('Work type is required');
+    }
+  }
+
+  private async checkDailyLimit(
+    userId: string,
+    date: Date,
+    durationMinutes: number,
+  ) {
+    const maxHoursStr = await this.settings.get('max_daily_hours');
+    const maxMinutes = parseInt(maxHoursStr ?? '10', 10) * 60;
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+    const existing = await this.prisma.timeEntry.aggregate({
+      where: { userId, date: { gte: dayStart, lte: dayEnd } },
+      _sum: { durationMinutes: true },
+    });
+    const alreadyLogged = existing._sum.durationMinutes ?? 0;
+    if (alreadyLogged + durationMinutes > maxMinutes) {
+      throw new BadRequestException(
+        `Adding this entry would exceed the daily limit of ${maxHoursStr} hours`,
+      );
+    }
+  }
+
   private async checkRetroactive(date: Date) {
     const allowed = await this.settings.get('allow_retroactive');
     if (allowed === 'false') {
@@ -406,5 +497,126 @@ export class TimeEntriesService {
       throw new ForbiddenException('Not allowed');
     }
     return this.prisma.timeEntry.delete({ where: { id } });
+  }
+
+  async getSuggestions(userId: string, date: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const [commits, gitProjects, clickupTasks, internalTasks] = await Promise.all([
+      this.prisma.gitCommit.findMany({
+        where: {
+          OR: [
+            { linkedUserId: userId },
+            { authorEmail: user?.email ?? '' },
+          ],
+          commitDate: { gte: dayStart, lte: dayEnd },
+          linkedTimeEntryId: null,
+        },
+        take: 10,
+        orderBy: { commitDate: 'desc' },
+      }),
+      this.prisma.project.findMany({
+        where: { gitRepositoryUrl: { not: null } },
+        select: { id: true, projectName: true, gitRepositoryUrl: true },
+      }),
+      this.prisma.clickUpTaskLink.findMany({
+        where: {
+          assignedUserId: userId,
+          NOT: { status: { in: ['closed', 'complete', 'done', 'completed'] } },
+        },
+        include: { project: { select: { id: true, projectName: true } } },
+        take: 10,
+        orderBy: { lastSyncDate: 'desc' },
+      }),
+      this.prisma.task.findMany({
+        where: {
+          assignedUserId: userId,
+          NOT: { status: { in: ['DONE', 'CANCELLED'] } },
+        },
+        include: { project: { select: { id: true, projectName: true } } },
+        take: 10,
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+
+    const gitSuggestions = await Promise.all(
+      commits.map(async (c) => {
+        const repoSlug = c.repository.split('/').pop() ?? '';
+        const project = gitProjects.find(
+          (p) => p.gitRepositoryUrl && p.gitRepositoryUrl.includes(repoSlug),
+        );
+
+        let taskId: string | null = c.linkedTaskId ?? null;
+        let taskName: string | null = null;
+        if (taskId) {
+          const task = await this.prisma.task.findUnique({
+            where: { id: taskId },
+            select: { taskName: true },
+          });
+          taskName = task?.taskName ?? null;
+        }
+
+        return {
+          source: 'GIT',
+          description: c.commitMessage.split('\n')[0].slice(0, 200),
+          projectId: project?.id ?? null,
+          projectName: project?.projectName ?? null,
+          taskId,
+          taskName,
+          durationMinutes: 30,
+          date,
+          relatedCommitHash: c.commitHash,
+          relatedClickUpTaskId: null as string | null,
+          workType: 'DEVELOPMENT',
+        };
+      }),
+    );
+
+    const clickupSuggestions = await Promise.all(
+      clickupTasks.map(async (t) => {
+        const internalTask = await this.prisma.task.findFirst({
+          where: { clickUpTaskId: t.clickUpTaskId },
+          select: { id: true, taskName: true },
+        });
+
+        return {
+          source: 'CLICKUP',
+          description: t.taskName,
+          projectId: t.projectId ?? null,
+          projectName: t.project?.projectName ?? null,
+          taskId: internalTask?.id ?? null,
+          taskName: internalTask?.taskName ?? null,
+          durationMinutes: t.estimatedTime ?? 60,
+          date,
+          relatedCommitHash: null as string | null,
+          relatedClickUpTaskId: t.clickUpTaskId,
+          workType: 'DEVELOPMENT',
+        };
+      }),
+    );
+
+    const internalTaskSuggestions = internalTasks.map((t) => ({
+      source: 'SUGGESTED',
+      description: t.taskName,
+      projectId: t.projectId,
+      projectName: t.project.projectName,
+      taskId: t.id,
+      taskName: t.taskName,
+      durationMinutes: t.estimatedHours ? Math.round(t.estimatedHours * 60) : 60,
+      date,
+      relatedCommitHash: null as string | null,
+      relatedClickUpTaskId: t.clickUpTaskId ?? null,
+      workType: 'DEVELOPMENT',
+    }));
+
+    return { suggestions: [...gitSuggestions, ...clickupSuggestions, ...internalTaskSuggestions] };
   }
 }

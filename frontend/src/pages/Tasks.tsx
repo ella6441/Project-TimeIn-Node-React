@@ -6,6 +6,8 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { tasksApi, type CreateTaskDto } from '../api/tasks.api';
 import { projectsApi } from '../api/projects.api';
 import { usersApi } from '../api/users.api';
+import { settingsApi } from '../api/settings.api';
+import { useAuthStore } from '../store/auth.store';
 import type { Task, Project, User } from '../types';
 
 const { Title } = Typography;
@@ -17,8 +19,19 @@ const priorityColor: Record<string, string> = {
   URGENT: 'red',
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  DONE: 'success',
+  IN_PROGRESS: 'processing',
+  CANCELLED: 'default',
+  TODO: 'blue',
+};
+
+const statusColor = (s: string) => STATUS_COLORS[s] ?? 'blue';
+
 export default function Tasks() {
   const { message } = App.useApp();
+  const currentUser = useAuthStore((s) => s.user);
+  const isReadOnly = currentUser?.role === 'EMPLOYEE';
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -29,10 +42,19 @@ export default function Tasks() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [taskStatuses, setTaskStatuses] = useState<string[]>(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']);
   const [form] = Form.useForm();
 
-  useEffect(() => { loadProjects(); loadUsers(); }, []);
-  useEffect(() => { load(); }, [page, filterProject]);
+  const loadSettings = async () => {
+    try {
+      const res = await settingsApi.findAll();
+      const s: Record<string, string> = {};
+      res.data.forEach((item) => { s[item.key] = item.value; });
+      if (s['task_statuses']) {
+        setTaskStatuses(s['task_statuses'].split(',').map((t) => t.trim()).filter(Boolean));
+      }
+    } catch { /* ignore */ }
+  };
 
   const loadProjects = async () => {
     try {
@@ -51,7 +73,11 @@ export default function Tasks() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await tasksApi.findAll({ page, limit: 10, projectId: filterProject });
+      const params = {
+        page, limit: 10,
+        projectId: filterProject,
+      };
+      const res = await tasksApi.findAll(params);
       setTasks(res.data.data);
       setTotal(res.data.total);
     } catch {
@@ -60,6 +86,11 @@ export default function Tasks() {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { loadProjects(); loadSettings(); if (!isReadOnly) loadUsers(); }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page, filterProject]);
 
   const openCreate = () => {
     setEditTask(null);
@@ -155,23 +186,21 @@ export default function Tasks() {
       title: 'Status',
       dataIndex: 'status',
       width: 150,
-      render: (v: string, record: Task) => (
-        <Select
-          value={v}
-          size="small"
-          style={{ width: 130 }}
-          loading={updatingStatus === record.id}
-          onChange={(newStatus) => handleStatusChange(record.id, newStatus)}
-          options={[
-            { value: 'TODO', label: <Tag color="blue">TODO</Tag> },
-            { value: 'IN_PROGRESS', label: <Tag color="processing">IN PROGRESS</Tag> },
-            { value: 'DONE', label: <Tag color="success">DONE</Tag> },
-            { value: 'CANCELLED', label: <Tag color="default">CANCELLED</Tag> },
-          ]}
-        />
-      ),
+      render: (v: string, record: Task) =>
+        isReadOnly ? (
+          <Tag color={statusColor(v)}>{v}</Tag>
+        ) : (
+          <Select
+            value={v}
+            size="small"
+            style={{ width: 140 }}
+            loading={updatingStatus === record.id}
+            onChange={(newStatus) => handleStatusChange(record.id, newStatus)}
+            options={taskStatuses.map((s) => ({ value: s, label: <Tag color={statusColor(s)}>{s}</Tag> }))}
+          />
+        ),
     },
-    {
+    ...(!isReadOnly ? [{
       title: 'Actions',
       width: 100,
       render: (_: unknown, record: Task) => (
@@ -182,14 +211,14 @@ export default function Tasks() {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ];
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={4} style={{ margin: 0 }}>Tasks</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>New Task</Button>
+        <Title level={4} style={{ margin: 0 }}>{isReadOnly ? 'My Tasks' : 'Tasks'}</Title>
+        {!isReadOnly && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>New Task</Button>}
       </div>
 
       <Row gutter={12} style={{ marginBottom: 16 }}>
@@ -214,7 +243,7 @@ export default function Tasks() {
         pagination={{ current: page, total, pageSize: 10, onChange: setPage }}
       />
 
-      <Modal
+      {!isReadOnly && <Modal
         title={editTask ? 'Edit Task' : 'New Task'}
         open={modalOpen}
         onOk={handleSubmit}
@@ -270,9 +299,9 @@ export default function Tasks() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="status" label="Status" initialValue="TODO">
+              <Form.Item name="status" label="Status" initialValue={taskStatuses[0] ?? 'TODO'}>
                 <Select
-                  options={['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED'].map((s) => ({ value: s, label: s }))}
+                  options={taskStatuses.map((s) => ({ value: s, label: s }))}
                 />
               </Form.Item>
             </Col>
@@ -281,7 +310,7 @@ export default function Tasks() {
             <Input placeholder="e.g. abc123xyz" />
           </Form.Item>
         </Form>
-      </Modal>
+      </Modal>}
     </div>
   );
 }

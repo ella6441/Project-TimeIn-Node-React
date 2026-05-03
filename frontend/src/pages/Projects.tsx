@@ -5,7 +5,9 @@ import {
 import { PlusOutlined, EditOutlined, InboxOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { projectsApi, type CreateProjectDto } from '../api/projects.api';
-import type { Project } from '../types';
+import { usersApi } from '../api/users.api';
+import { useAuthStore } from '../store/auth.store';
+import type { Project, User } from '../types';
 
 const { Title } = Typography;
 
@@ -17,15 +19,17 @@ const statusColor: Record<string, string> = {
 
 export default function Projects() {
   const { message } = App.useApp();
+  const currentUser = useAuthStore((s) => s.user);
+  const isReadOnly = currentUser?.role === 'EMPLOYEE';
+  const isAdmin = currentUser?.role === 'ADMIN';
   const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [form] = Form.useForm();
-
-  useEffect(() => { load(); }, [page]);
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +44,16 @@ export default function Projects() {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const res = await usersApi.findAll({ limit: 100 });
+      setUsers(res.data.data);
+    } catch { /* ignore */ }
+  };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { load(); if (isAdmin) loadUsers(); }, [page]);
+
   const openCreate = () => {
     setEditProject(null);
     form.resetFields();
@@ -52,6 +66,7 @@ export default function Projects() {
       projectName: p.projectName,
       description: p.description,
       status: p.status,
+      managerId: p.managerId,
       gitRepositoryUrl: p.gitRepositoryUrl,
       externalClickUpListId: p.externalClickUpListId,
     });
@@ -90,6 +105,12 @@ export default function Projects() {
     { title: 'Project Name', dataIndex: 'projectName', width: 180 },
     { title: 'Description', dataIndex: 'description', render: (v: string | null) => v ?? '—' },
     {
+      title: 'Manager',
+      dataIndex: ['manager', 'fullName'],
+      width: 140,
+      render: (v: string | undefined) => v ?? '—',
+    },
+    {
       title: 'Git Repository',
       dataIndex: 'gitRepositoryUrl',
       width: 200,
@@ -114,7 +135,7 @@ export default function Projects() {
       width: 120,
       render: (v: string) => dayjs(v).format('DD/MM/YYYY'),
     },
-    {
+    ...(!isReadOnly ? [{
       title: 'Actions',
       width: 130,
       render: (_: unknown, record: Project) => (
@@ -127,14 +148,14 @@ export default function Projects() {
           )}
         </Space>
       ),
-    },
+    }] : []),
   ];
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <Title level={4} style={{ margin: 0 }}>Projects</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>New Project</Button>
+        {!isReadOnly && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>New Project</Button>}
       </div>
 
       <Table
@@ -146,7 +167,7 @@ export default function Projects() {
         pagination={{ current: page, total, pageSize: 10, onChange: setPage }}
       />
 
-      <Modal
+      {!isReadOnly && <Modal
         title={editProject ? 'Edit Project' : 'New Project'}
         open={modalOpen}
         onOk={handleSubmit}
@@ -166,6 +187,19 @@ export default function Projects() {
               options={['ACTIVE', 'INACTIVE', 'ARCHIVED'].map((s) => ({ value: s, label: s }))}
             />
           </Form.Item>
+          {isAdmin && (
+            <Form.Item name="managerId" label="Project Manager">
+              <Select
+                placeholder="Assign a manager"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={users
+                  .filter((u) => u.role === 'MANAGER' || u.role === 'ADMIN')
+                  .map((u) => ({ value: u.id, label: u.fullName }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="gitRepositoryUrl"
             label="Git Repository URL"
@@ -177,7 +211,7 @@ export default function Projects() {
             <Input placeholder="e.g. abc123xyz" />
           </Form.Item>
         </Form>
-      </Modal>
+      </Modal>}
     </div>
   );
 }

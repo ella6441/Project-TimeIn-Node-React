@@ -20,11 +20,8 @@ export class CreateTaskDto {
   @IsOptional()
   assignedUserId?: string;
 
-  @ApiPropertyOptional({
-    enum: ['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED'],
-    default: 'TODO',
-  })
-  @IsIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED'])
+  @ApiPropertyOptional({ example: 'TODO', default: 'TODO' })
+  @IsString()
   @IsOptional()
   status?: string;
 

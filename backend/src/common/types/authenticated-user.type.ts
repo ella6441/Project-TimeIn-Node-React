@@ -4,6 +4,7 @@ export type AuthenticatedUser = {
   email: string;
   role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
   team: string | null;
+  managerId: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

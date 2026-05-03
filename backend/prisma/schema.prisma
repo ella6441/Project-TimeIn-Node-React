@@ -14,13 +14,18 @@ model User {
   password    String
   role        String   @default("EMPLOYEE")
   team        String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  managerId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  managedProjects Project[]   @relation("ProjectManager")
+  manager         User?          @relation("TeamManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees       User[]         @relation("TeamManager")
+  managedProjects Project[]      @relation("ProjectManager")
   assignedTasks   Task[]
   timeEntries     TimeEntry[]
+  notifications   Notification[]
+  gitCommits      GitCommit[]    @relation("GitCommitUser")
 }
 
 model Project {
@@ -34,9 +39,10 @@ model Project {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  manager     User?       @relation("ProjectManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tasks       Task[]
-  timeEntries TimeEntry[]
+  manager          User?             @relation("ProjectManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks            Task[]
+  timeEntries      TimeEntry[]
+  clickUpTaskLinks ClickUpTaskLink[] @relation("ClickUpTaskProject")
 }
 
 model Task {
@@ -63,6 +69,17 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 }
 
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
 model TimeEntry {
   id                   String   @id @default(uuid())
   userId               String
@@ -84,4 +101,37 @@ model TimeEntry {
   user    User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   project Project @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   task    Task    @relation(fields: [taskId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model GitCommit {
+  id                String   @id @default(uuid())
+  commitHash        String   @unique
+  repository        String
+  branch            String?
+  commitMessage     String
+  authorEmail       String
+  authorName        String
+  commitDate        DateTime
+  linkedUserId      String?
+  linkedTaskId      String?
+  linkedTimeEntryId String?
+  createdAt         DateTime @default(now())
+
+  linkedUser User? @relation("GitCommitUser", fields: [linkedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model ClickUpTaskLink {
+  id             String    @id @default(uuid())
+  clickUpTaskId  String    @unique
+  taskName       String
+  description    String?
+  projectId      String?
+  assignedUserId String?
+  status         String?
+  estimatedTime  Int?
+  dueDate        DateTime?
+  lastSyncDate   DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  project Project? @relation("ClickUpTaskProject", fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

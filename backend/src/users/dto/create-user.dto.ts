@@ -33,4 +33,11 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   team?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID of the manager this user reports to',
+  })
+  @IsString()
+  @IsOptional()
+  managerId?: string;
 }

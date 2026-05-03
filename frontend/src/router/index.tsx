@@ -1,5 +1,4 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { useAuthStore } from '../store/auth.store';
 import AppLayout from '../layouts/AppLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
@@ -10,25 +9,7 @@ import Users from '../pages/Users';
 import Reports from '../pages/Reports';
 import Settings from '../pages/Settings';
 import Integrations from '../pages/Integrations';
-import type { Role } from '../types';
-
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((s) => s.accessToken);
-  if (!token) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function RequireRole({
-  children,
-  roles,
-}: {
-  children: React.ReactNode;
-  roles: Role[];
-}) {
-  const user = useAuthStore((s) => s.user);
-  if (!user || !roles.includes(user.role)) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
+import { RequireAuth, RequireRole } from './guards';
 
 export const router = createBrowserRouter([
   {
@@ -48,7 +29,7 @@ export const router = createBrowserRouter([
       {
         path: 'projects',
         element: (
-          <RequireRole roles={['MANAGER', 'ADMIN']}>
+          <RequireRole roles={['EMPLOYEE', 'MANAGER', 'ADMIN']}>
             <Projects />
           </RequireRole>
         ),
@@ -56,7 +37,7 @@ export const router = createBrowserRouter([
       {
         path: 'tasks',
         element: (
-          <RequireRole roles={['MANAGER', 'ADMIN']}>
+          <RequireRole roles={['EMPLOYEE', 'MANAGER', 'ADMIN']}>
             <Tasks />
           </RequireRole>
         ),
@@ -64,7 +45,7 @@ export const router = createBrowserRouter([
       {
         path: 'users',
         element: (
-          <RequireRole roles={['ADMIN']}>
+          <RequireRole roles={['ADMIN', 'MANAGER']}>
             <Users />
           </RequireRole>
         ),

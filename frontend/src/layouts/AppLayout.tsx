@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -8,6 +8,14 @@ import {
   Typography,
   Dropdown,
   theme,
+  Badge,
+  Popover,
+  List,
+  Tag,
+  Empty,
+  DatePicker,
+  Divider,
+  message,
 } from 'antd';
 import {
   DashboardOutlined,
@@ -22,10 +30,16 @@ import {
   MenuUnfoldOutlined,
   LogoutOutlined,
   UserOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuthStore } from '../store/auth.store';
 import { authApi } from '../api/auth.api';
-import type { Role } from '../types';
+import { notificationsApi } from '../api/notifications.api';
+import type { Role, Notification } from '../types';
+
+dayjs.extend(relativeTime);
 
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
@@ -40,9 +54,9 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { key: '/', icon: <DashboardOutlined />, label: 'Dashboard', roles: ['EMPLOYEE', 'MANAGER', 'ADMIN'] },
   { key: '/time-entries', icon: <ClockCircleOutlined />, label: 'Time Entries', roles: ['EMPLOYEE', 'MANAGER', 'ADMIN'] },
-  { key: '/projects', icon: <ProjectOutlined />, label: 'Projects', roles: ['MANAGER', 'ADMIN'] },
-  { key: '/tasks', icon: <CheckSquareOutlined />, label: 'Tasks', roles: ['MANAGER', 'ADMIN'] },
-  { key: '/users', icon: <TeamOutlined />, label: 'Users', roles: ['ADMIN'] },
+  { key: '/projects', icon: <ProjectOutlined />, label: 'Projects', roles: ['EMPLOYEE', 'MANAGER', 'ADMIN'] },
+  { key: '/tasks', icon: <CheckSquareOutlined />, label: 'Tasks', roles: ['EMPLOYEE', 'MANAGER', 'ADMIN'] },
+  { key: '/users', icon: <TeamOutlined />, label: 'Users', roles: ['ADMIN', 'MANAGER'] },
   { key: '/reports', icon: <BarChartOutlined />, label: 'Reports', roles: ['MANAGER', 'ADMIN'] },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings', roles: ['ADMIN'] },
   { key: '/integrations', icon: <ApiOutlined />, label: 'Integrations', roles: ['ADMIN'] },
@@ -50,10 +64,56 @@ const menuItems: MenuItem[] = [
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [remindRange, setRemindRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [reminding, setReminding] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { token } = theme.useToken();
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res = await notificationsApi.countUnread();
+      setUnreadCount(res.data.count);
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationsApi.findMine({ limit: 20 });
+      setNotifications(res.data.data);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    fetchUnread();
+    intervalRef.current = setInterval(fetchUnread, 30000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [fetchUnread]);
+
+  const handleOpenNotif = async (open: boolean) => {
+    setNotifOpen(open);
+    if (open) {
+      await fetchNotifications();
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    await notificationsApi.markAllRead();
+    setUnreadCount(0);
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const handleMarkRead = async (n: Notification) => {
+    if (n.isRead) return;
+    await notificationsApi.markRead(n.id);
+    setUnreadCount((c) => Math.max(0, c - 1));
+    setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, isRead: true } : x));
+  };
 
   const visibleItems = menuItems
     .filter((item) => user && item.roles.includes(user.role))
@@ -139,21 +199,82 @@ export default function AppLayout() {
             onClick={() => setCollapsed(!collapsed)}
             style={{ fontSize: 16 }}
           />
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Popover
+              open={notifOpen}
+              onOpenChange={handleOpenNotif}
+              trigger="click"
+              placement="bottomRight"
+              arrow={false}
+              content={
+                <div style={{ width: 340 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <Button type="link" size="small" onClick={handleMarkAllRead} style={{ padding: 0, fontSize: 12 }}>
+                        Mark all as read
+                      </Button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <Empty description="No notifications" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ margin: '16px 0' }} />
+                  ) : (
+                    <List
+                      dataSource={notifications}
+                      style={{ maxHeight: 380, overflowY: 'auto' }}
+                      renderItem={(n) => (
+                        <List.Item
+                          key={n.id}
+                          onClick={() => handleMarkRead(n)}
+                          style={{
+                            padding: '10px 12px',
+                            background: n.isRead ? 'transparent' : token.colorPrimaryBg,
+                            borderRadius: 6,
+                            cursor: n.isRead ? 'default' : 'pointer',
+                            marginBottom: 4,
+                            borderBottom: 'none',
+                          }}
+                        >
+                          <div style={{ width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: n.isRead ? 400 : 600, fontSize: 13 }}>{n.title}</span>
+                              {!n.isRead && <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>New</Tag>}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{n.body}</div>
+                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{dayjs(n.createdAt).fromNow()}</div>
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  )}
+                </div>
+              }
             >
-              <Avatar icon={<UserOutlined />} style={{ background: token.colorPrimary }} />
-              <div style={{ lineHeight: 1.3 }}>
-                <Text strong style={{ display: 'block', fontSize: 13 }}>
-                  {user?.fullName}
-                </Text>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  {user?.role}
-                </Text>
+              <Badge count={unreadCount} size="small" offset={[-2, 2]}>
+                <Button
+                  type="text"
+                  icon={<BellOutlined style={{ fontSize: 18 }} />}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36 }}
+                />
+              </Badge>
+            </Popover>
+
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+              >
+                <Avatar icon={<UserOutlined />} style={{ background: token.colorPrimary }} />
+                <div style={{ lineHeight: 1.3 }}>
+                  <Text strong style={{ display: 'block', fontSize: 13 }}>
+                    {user?.fullName}
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {user?.role}
+                  </Text>
+                </div>
               </div>
-            </div>
-          </Dropdown>
+            </Dropdown>
+          </div>
         </Header>
 
         <Content

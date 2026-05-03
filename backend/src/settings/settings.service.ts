@@ -5,6 +5,11 @@ import { UpdateSettingDto } from './dto/update-setting.dto';
 const DEFAULTS: Record<string, string> = {
   allow_retroactive: 'true',
   max_retroactive_days: '30',
+  max_daily_hours: '10',
+  require_description: 'false',
+  require_work_type: 'false',
+  work_types: 'DEVELOPMENT,DESIGN,MEETINGS,REVIEW,TESTING,OTHER',
+  task_statuses: 'TODO,IN_PROGRESS,DONE,CANCELLED',
 };
 
 @Injectable()
@@ -34,7 +39,9 @@ export class SettingsService implements OnModuleInit {
   }
 
   async get(key: string): Promise<string | null> {
-    const setting = await this.prisma.systemSetting.findUnique({ where: { key } });
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key },
+    });
     return setting?.value ?? DEFAULTS[key] ?? null;
   }
 }

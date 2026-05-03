@@ -11,7 +11,9 @@ import { TimeEntriesModule } from './time-entries/time-entries.module';
 import { ReportsModule } from './reports/reports.module';
 import { TimerModule } from './timer/timer.module';
 import { SettingsModule } from './settings/settings.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { RedisModule } from './redis/redis.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware';
 
 @Module({
@@ -31,6 +33,8 @@ import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware
     ReportsModule,
     TimerModule,
     SettingsModule,
+    NotificationsModule,
+    IntegrationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

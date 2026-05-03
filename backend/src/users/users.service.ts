@@ -35,9 +35,9 @@ export class UsersService {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 10;
 
-    // MANAGER sees only their team, ADMIN sees all
+    // MANAGER sees only employees assigned to them
     const where =
-      requester.role === 'MANAGER' ? { team: requester.team ?? undefined } : {};
+      requester.role === 'MANAGER' ? { managerId: requester.id } : {};
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -50,7 +50,9 @@ export class UsersService {
           email: true,
           role: true,
           team: true,
+          managerId: true,
           isActive: true,
+          createdAt: true,
         },
       }),
       this.prisma.user.count({ where }),
@@ -68,7 +70,9 @@ export class UsersService {
         email: true,
         role: true,
         team: true,
+        managerId: true,
         isActive: true,
+        createdAt: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -80,7 +84,16 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: dto,
-      select: { id: true, fullName: true, email: true, role: true, team: true, isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        team: true,
+        managerId: true,
+        isActive: true,
+        createdAt: true,
+      },
     });
   }
 

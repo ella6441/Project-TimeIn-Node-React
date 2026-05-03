@@ -1,6 +1,20 @@
 import client from './client';
 import type { TimeEntry, PaginatedResponse, HoursSummary } from '../types';
 
+export interface TimeEntrySuggestion {
+  source: 'GIT' | 'CLICKUP' | 'SUGGESTED';
+  description: string;
+  projectId: string | null;
+  projectName: string | null;
+  taskId: string | null;
+  taskName: string | null;
+  durationMinutes: number;
+  date: string;
+  relatedCommitHash: string | null;
+  relatedClickUpTaskId: string | null;
+  workType: string;
+}
+
 export interface CreateTimeEntryDto {
   projectId: string;
   taskId: string;
@@ -60,4 +74,7 @@ export const timeEntriesApi = {
 
   delete: (id: string) =>
     client.delete(`/time-entries/${id}`),
+
+  getSuggestions: (date?: string) =>
+    client.get<{ suggestions: TimeEntrySuggestion[] }>('/time-entries/suggestions', { params: date ? { date } : undefined }),
 };
