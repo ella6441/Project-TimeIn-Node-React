@@ -1,17 +1,9 @@
 import 'dotenv/config';
 import { PrismaClient } from '../src/generated/prisma';
-import { PrismaMssql } from '@prisma/adapter-mssql';
 import * as bcrypt from 'bcrypt';
 
 async function main() {
-  const factory = new PrismaMssql({
-    server: 'ELLACOMPUTER',
-    database: 'timein',
-    user: 'timein_user',
-    password: 'TimeIn@2026!',
-    options: { trustServerCertificate: true },
-  });
-  const prisma = new PrismaClient({ adapter: factory } as any);
+  const prisma = new PrismaClient();
 
   console.log('Seeding database...');
 
