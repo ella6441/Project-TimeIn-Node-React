@@ -13,9 +13,6 @@ import {
   List,
   Tag,
   Empty,
-  DatePicker,
-  Divider,
-  message,
 } from 'antd';
 import {
   DashboardOutlined,
@@ -67,8 +64,6 @@ export default function AppLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [remindRange, setRemindRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
-  const [reminding, setReminding] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
