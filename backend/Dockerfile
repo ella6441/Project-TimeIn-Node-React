@@ -4,15 +4,18 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY prisma.config.ts ./
-COPY prisma/schema.prisma ./prisma/
+COPY prisma/ ./prisma/
+COPY nest-cli.json ./
+COPY tsconfig*.json ./
 
 RUN npm ci
 
-COPY . .
+COPY src/ ./src/
 
-RUN npx prisma generate
-RUN npm run build
+RUN npx prisma generate && ls src/generated/prisma/
+RUN npm run build && ls dist/
+RUN ls dist/main.js
 
 EXPOSE 3000
 
-CMD npx prisma db push && node dist/main
+CMD ["sh", "-c", "npx prisma db push && node dist/main"]
