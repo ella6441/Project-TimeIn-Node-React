@@ -195,18 +195,18 @@ export default function TimeEntries() {
       let startTimeStr: string;
       let endTimeStr: string;
       if (inputMode === 'duration') {
-        const start = values.startTime as ReturnType<typeof dayjs>;
+        const start = dayjs(`${dateStr}T${(values.startTime as Dayjs).format('HH:mm:ss')}`);
         const durationMins = Math.round((values.durationHours as number) * 60);
         const end = start.add(durationMins, 'minute');
-        startTimeStr = `${dateStr}T${start.format('HH:mm:ss')}`;
-        endTimeStr = `${dateStr}T${end.format('HH:mm:ss')}`;
+        startTimeStr = start.toISOString();
+        endTimeStr = end.toISOString();
       } else {
         if (!values.endTime.isAfter(values.startTime)) {
           message.error('End time must be after start time');
           return;
         }
-        startTimeStr = `${dateStr}T${values.startTime.format('HH:mm:ss')}`;
-        endTimeStr = `${dateStr}T${values.endTime.format('HH:mm:ss')}`;
+        startTimeStr = dayjs(`${dateStr}T${(values.startTime as Dayjs).format('HH:mm:ss')}`).toISOString();
+        endTimeStr = dayjs(`${dateStr}T${(values.endTime as Dayjs).format('HH:mm:ss')}`).toISOString();
       }
       const dto: CreateTimeEntryDto = {
         projectId: values.projectId,

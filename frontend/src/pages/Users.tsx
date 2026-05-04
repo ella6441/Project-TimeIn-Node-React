@@ -174,7 +174,7 @@ export default function Users() {
           title="Create New User"
           open={createOpen}
           onOk={handleCreate}
-          onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+          onCancel={() => { setCreateOpen(false); createForm.resetFields(); setCreateRole('EMPLOYEE'); }}
           okText="Create"
           destroyOnHidden
         >
