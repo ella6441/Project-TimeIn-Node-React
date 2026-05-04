@@ -3,9 +3,6 @@ import { PrismaClient } from '../generated/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
-// pg reads TIMESTAMP WITHOUT TIME ZONE as local time — force UTC
-pg.types.setTypeParser(1114, (str: string) => new Date(str + 'Z'));
-
 @Injectable()
 export class PrismaService
   extends PrismaClient
