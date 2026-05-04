@@ -323,8 +323,8 @@ export default function TimeEntries() {
           ...(isManagerOrAdmin ? [e.user?.fullName ?? ''] : []),
           e.project?.projectName ?? '',
           e.task?.taskName ?? '',
-          dayjs(e.startTime).format('HH:mm'),
-          dayjs(e.endTime).format('HH:mm'),
+          new Date(e.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          new Date(e.endTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
           e.durationMinutes,
           e.workType,
           e.description ?? '',
@@ -402,8 +402,13 @@ export default function TimeEntries() {
     { title: 'Task', dataIndex: ['task', 'taskName'], width: 140 },
     {
       title: 'Time',
-      render: (_: unknown, r: TimeEntry) =>
-        `${dayjs(r.startTime).format('HH:mm')} – ${dayjs(r.endTime).format('HH:mm')}`,
+      render: (_: unknown, r: TimeEntry) => {
+        const fmt = (iso: string) => {
+          const d = new Date(iso);
+          return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        };
+        return `${fmt(r.startTime)} – ${fmt(r.endTime)}`;
+      },
       width: 120,
     },
     {
