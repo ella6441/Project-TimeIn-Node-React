@@ -1,6 +1,10 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '../generated/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+
+// pg reads TIMESTAMP WITHOUT TIME ZONE as local time — force UTC
+pg.types.setTypeParser(1114, (str: string) => new Date(str + 'Z'));
 
 @Injectable()
 export class PrismaService
@@ -8,7 +12,8 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    const adapter = new PrismaPg(pool);
     super({ adapter });
   }
 
